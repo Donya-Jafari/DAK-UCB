@@ -1,0 +1,32 @@
+# DAK-UCB configuration
+
+experiment:
+  name: Image-Captioning
+  algorithm: ONE-ARM-ORACLE
+  objective: I-JRKE  # or JKD
+
+modes:
+  random: false
+  onearm: true
+  pak: false
+  mix: false
+  oracle_choice: 0
+
+hyperparams:
+  constant: 1e-4
+  runs: 10
+  model_count: 3
+  iterations: 2000
+  prompt_feature_count: 512
+  image_feature_count: 768
+  delta: 5.8
+  alpha: 1.0
+  gamma: 1.0
+  lambd: 1.0
+
+models:
+  names: ["kandinsky", "sdxl", "gigagan"]
+
+runtime:
+  use_mock_data: true
+  seed: 42
