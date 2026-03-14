@@ -4,6 +4,8 @@ from sklearn.kernel_ridge import KernelRidge
 
 
 def rbf_kernel(x, y, gamma):
+    x = np.nan_to_num(x, nan=0.0, posinf=1.0, neginf=-1.0)
+    y = np.nan_to_num(y, nan=0.0, posinf=1.0, neginf=-1.0)
     return sklearn.metrics.pairwise.rbf_kernel(x, y, gamma=gamma)
 
 

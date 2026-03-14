@@ -3,3 +3,9 @@ scikit-learn
 scipy
 torch
 pyyaml
+diffusers
+transformers
+accelerate
+torchvision
+safetensors
+pillow
