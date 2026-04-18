@@ -1,5 +1,6 @@
 import numpy as np
 from pathlib import Path
+from typing import Optional
 from PIL import Image
 from sklearn.kernel_ridge import KernelRidge
 from scipy.optimize import minimize
@@ -12,7 +13,7 @@ from .embeddings import EmbeddingBackend
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
-def _load_image_paths(image_dir: str | None, label: str):
+def _load_image_paths(image_dir: Optional[str], label: str):
     if not image_dir:
         raise ValueError(f"Missing image_dir for {label}")
     img_dir = Path(image_dir).expanduser()
@@ -22,7 +23,7 @@ def _load_image_paths(image_dir: str | None, label: str):
     return paths
 
 
-def _load_text_lines(text_file: str | None, label: str):
+def _load_text_lines(text_file: Optional[str], label: str):
     if not text_file:
         raise ValueError(f"Missing text_file for {label}")
     txt = Path(text_file).expanduser()

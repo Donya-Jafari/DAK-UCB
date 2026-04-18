@@ -1,5 +1,8 @@
+from typing import Optional
+
+
 class ImageGeneratorBackend:
-    def __init__(self, model_name: str, model_type: str, model_id: str, prior_id: str | None, use_mock_data: bool, device: str):
+    def __init__(self, model_name: str, model_type: str, model_id: str, prior_id: Optional[str], use_mock_data: bool, device: str):
         self.model_name = model_name
         self.model_type = model_type
         self.model_id = model_id

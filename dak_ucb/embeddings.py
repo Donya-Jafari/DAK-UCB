@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from typing import Optional
 
 
 class EmbeddingBackend:
@@ -11,7 +12,7 @@ class EmbeddingBackend:
         clip_model_id: str,
         dinov2_model_id: str,
         device: str,
-        seed: int | None = None,
+        seed: Optional[int] = None,
     ):
         self.prompt_dim = prompt_dim
         self.image_dim = image_dim
