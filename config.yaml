@@ -12,6 +12,9 @@ experiment:
   input:
     image_dir: input_dataset/images
     text_file: input_dataset/prompts.txt
+  target:
+    image_dir: target_dataset/images
+    text_file: target_dataset/prompts.txt
   output:
     image_dir: output_dataset/images
     text_file: output_dataset/prompts.txt
@@ -38,27 +41,26 @@ models:
   image_generation:
     - name: kandinsky
       type: kandinsky
-      model_id: kandinsky-community/kandinsky-2-2-decoder
-      prior_id: kandinsky-community/kandinsky-2-2-prior
+      model_id: kandinsky-community/kandinsky-2-1
     - name: sdxl
       type: sdxl
       model_id: stabilityai/stable-diffusion-xl-base-1.0
   captioning:
     - name: blip2
       type: blip2
-      model_id: Salesforce/blip2-flan-t5-xl
+      model_id: Salesforce/blip2-opt-2.7b
     - name: instructblip
       type: instructblip
       model_id: Salesforce/instructblip-flan-t5-xl
     - name: llava
       type: llava
-      model_id: llava-hf/llava-1.5-7b-hf
+      model_id: llava-hf/llava-v1.6-mistral-7b-hf
   llm:
   embeddings:
     clip_model_id: openai/clip-vit-large-patch14
     dinov2_model_id: facebook/dinov2-base
 
 runtime:
-  use_mock_data: true
+  use_mock_data: false
   seed: 42
-  device: cpu
+  device: gpu

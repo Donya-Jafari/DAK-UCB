@@ -20,28 +20,25 @@ class ImageGeneratorBackend:
 
     def _generate_sdxl(self, prompt: str):
         if self._pipeline is None:
-            from diffusers import AutoPipelineForText2Image
+            import torch
+            from diffusers import StableDiffusionXLPipeline
 
-            self._pipeline = AutoPipelineForText2Image.from_pretrained(
-                self.model_id, torch_dtype=None
+            self._pipeline = StableDiffusionXLPipeline.from_pretrained(
+                self.model_id, torch_dtype=torch.float16
             ).to(self.device)
         image = self._pipeline(prompt=prompt).images[0]
         return image
 
     def _generate_kandinsky(self, prompt: str):
-        if self._pipeline is None or self._prior is None:
-            from diffusers import KandinskyV22Pipeline, KandinskyV22PriorPipeline
+        if self._pipeline is None:
+            import torch
+            from diffusers import AutoPipelineForText2Image
 
-            if not self.prior_id:
-                raise ValueError("Kandinsky requires a prior_id in config.")
-            self._prior = KandinskyV22PriorPipeline.from_pretrained(self.prior_id).to(self.device)
-            self._pipeline = KandinskyV22Pipeline.from_pretrained(self.model_id).to(self.device)
-        prior_out = self._prior(prompt=prompt)
-        image = self._pipeline(
-            prompt=prompt,
-            image_embeds=prior_out.image_embeds,
-            negative_image_embeds=prior_out.negative_image_embeds,
-        ).images[0]
+            self._pipeline = AutoPipelineForText2Image.from_pretrained(
+                self.model_id, torch_dtype=torch.float16
+            ).to(self.device)
+            self._pipeline.to(torch.bfloat16)
+        image = self._pipeline(prompt=prompt).images[0]
         return image
 
 
@@ -65,24 +62,82 @@ class CaptioningBackend:
         raise NotImplementedError(f"Unknown captioning type: {self.model_type}")
 
     def _caption_blip_family(self, image):
-        if self._model is None:
-            from transformers import AutoProcessor, AutoModelForVision2Seq
+        import torch
 
-            self._processor = AutoProcessor.from_pretrained(self.model_id)
-            self._model = AutoModelForVision2Seq.from_pretrained(self.model_id).to(self.device)
+        if self.model_type == "instructblip":
+            if self._model is None:
+                from transformers import InstructBlipForConditionalGeneration, InstructBlipProcessor
+
+                self._processor = InstructBlipProcessor.from_pretrained(self.model_id)
+                self._model = InstructBlipForConditionalGeneration.from_pretrained(
+                    self.model_id,
+                    torch_dtype=torch.float16,
+                    low_cpu_mem_usage=True,
+                ).to(self.device)
+                self._model.eval()
+            prompt = "Generate a concise caption describing only what is visually apparent in this image in one short sentence."
+            inputs = self._processor(
+                images=image,
+                text=prompt,
+                return_tensors="pt",
+            ).to(self.device, torch.float16)
+            out = self._model.generate(
+                **inputs,
+                max_new_tokens=100,
+                do_sample=False,
+                temperature=0.1,
+            )
+            return self._processor.decode(out[0], skip_special_tokens=True).strip()
+
+        if self._model is None:
+            from transformers import Blip2ForConditionalGeneration, Blip2Processor
+
+            self._processor = Blip2Processor.from_pretrained(self.model_id)
+            self._model = Blip2ForConditionalGeneration.from_pretrained(
+                self.model_id,
+                torch_dtype=torch.float16,
+                device_map="auto" if self.device == "cuda" else None,
+            )
             self._model.eval()
-        inputs = self._processor(images=image, return_tensors="pt").to(self.device)
-        out = self._model.generate(**inputs, max_new_tokens=32)
-        return self._processor.batch_decode(out, skip_special_tokens=True)[0]
+        prompt = "Question: Briefly describe this image. Answer:"
+        inputs = self._processor(
+            images=image,
+            text=prompt,
+            return_tensors="pt",
+        ).to(self.device, torch.float16)
+        out = self._model.generate(
+            **inputs,
+            max_new_tokens=50,
+            do_sample=False,
+            temperature=0.7,
+        )
+        full_output = self._processor.decode(out[0], skip_special_tokens=True)
+        return full_output.replace(prompt, "").strip()
 
     def _caption_llava(self, image):
         if self._model is None:
-            from transformers import AutoProcessor, LlavaForConditionalGeneration
+            import torch
+            from transformers import LlavaNextForConditionalGeneration, LlavaNextProcessor
 
-            self._processor = AutoProcessor.from_pretrained(self.model_id)
-            self._model = LlavaForConditionalGeneration.from_pretrained(self.model_id).to(self.device)
+            self._processor = LlavaNextProcessor.from_pretrained(self.model_id)
+            self._model = LlavaNextForConditionalGeneration.from_pretrained(
+                self.model_id,
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True,
+            ).to(self.device)
             self._model.eval()
-        prompt = "Describe the image."
-        inputs = self._processor(text=prompt, images=image, return_tensors="pt").to(self.device)
-        out = self._model.generate(**inputs, max_new_tokens=64)
-        return self._processor.batch_decode(out, skip_special_tokens=True)[0]
+        prompt = "Generate a concise caption describing only what is visually apparent in this image in one short sentence."
+        prompt_template = f"USER: <image>\n{prompt}\nASSISTANT:"
+        inputs = self._processor(
+            text=prompt_template,
+            images=image,
+            return_tensors="pt",
+        ).to(self.device, torch.float16)
+        out = self._model.generate(
+            **inputs,
+            max_new_tokens=100,
+            do_sample=False,
+            temperature=0.1,
+        )
+        full_output = self._processor.batch_decode(out, skip_special_tokens=True)[0]
+        return full_output.split("ASSISTANT:")[-1].strip()

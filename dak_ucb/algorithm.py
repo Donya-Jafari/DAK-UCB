@@ -9,18 +9,35 @@ from .models import ImageGeneratorBackend, CaptioningBackend
 from .embeddings import EmbeddingBackend
 
 
-def _load_inputs(task: str, input_cfg: dict):
-    if task == "image_captioning":
-        img_dir = Path(input_cfg["image_dir"]).expanduser()
-        paths = sorted([p for p in img_dir.iterdir() if p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}])
-        if not paths:
-            raise ValueError(f"No images found in {img_dir}")
-        return paths
-    txt = Path(input_cfg["text_file"]).expanduser()
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _load_image_paths(image_dir: str | None, label: str):
+    if not image_dir:
+        raise ValueError(f"Missing image_dir for {label}")
+    img_dir = Path(image_dir).expanduser()
+    paths = sorted([p for p in img_dir.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES])
+    if not paths:
+        raise ValueError(f"No images found in {img_dir}")
+    return paths
+
+
+def _load_text_lines(text_file: str | None, label: str):
+    if not text_file:
+        raise ValueError(f"Missing text_file for {label}")
+    txt = Path(text_file).expanduser()
     lines = [l.strip() for l in txt.read_text(encoding="utf-8").splitlines() if l.strip()]
     if not lines:
         raise ValueError(f"No text lines found in {txt}")
     return lines
+
+
+def _load_dataset_items(data_type: str, data_cfg: dict, label: str):
+    if data_type == "image":
+        return _load_image_paths(data_cfg.get("image_dir"), label)
+    if data_type == "text":
+        return _load_text_lines(data_cfg.get("text_file"), label)
+    raise ValueError(f"Unsupported dataset type for {label}: {data_type}")
 
 
 def run_dak_ucb(cfg: dict):
@@ -83,7 +100,18 @@ def run_dak_ucb(cfg: dict):
         raise ValueError("Invalid delta: must satisfy 2*model_count/delta > 1")
     eta = np.sqrt(2.0 * np.log(2.0 * model_count / delta))
 
-    inputs = _load_inputs(task, exp["input"])
+    input_cfg = exp["input"]
+    target_cfg = exp.get("target")
+    if target_cfg is None:
+        raise ValueError("Missing experiment.target configuration")
+
+    inputs = _load_dataset_items(input_type, input_cfg, "experiment.input")
+    targets = _load_dataset_items(output_type, target_cfg, "experiment.target")
+    if len(inputs) != len(targets):
+        raise ValueError(
+            f"Input/target dataset size mismatch: {len(inputs)} inputs vs {len(targets)} targets"
+        )
+
     output_cfg = exp["output"]
     output_image_dir = Path(output_cfg["image_dir"]).expanduser()
     output_text_file = Path(output_cfg["text_file"]).expanduser()
@@ -118,6 +146,11 @@ def run_dak_ucb(cfg: dict):
 
     def encode_output(item):
         return emb.encode_image(item) if output_type == "image" else emb.encode_prompt(item)
+
+    def materialize_item(item, data_type: str):
+        if data_type == "image":
+            return Image.open(item).convert("RGB")
+        return item
 
     def clip_image_for_score(input_item, output_item):
         if task == "image_generation":
@@ -159,13 +192,17 @@ def run_dak_ucb(cfg: dict):
         visits = np.zeros((model_count,), dtype=int)
 
         for iteration in range(iterations):
-            input_item = inputs[iteration]
+            input_ref = inputs[iteration]
+            target_ref = targets[iteration]
+
+            input_item = materialize_item(input_ref, input_type)
+            target_item = materialize_item(target_ref, output_type)
+
             if input_type == "image":
-                input_path = Path(input_item)
-                input_item = Image.open(input_item).convert("RGB")
-                input_id = input_path.name
+                input_id = Path(input_ref).name
             else:
                 input_id = str(iteration)
+
             input_emb = encode_input(input_item).reshape(1, -1)
 
             if iteration < model_count:
@@ -206,7 +243,7 @@ def run_dak_ucb(cfg: dict):
                 append_output_text(output_item, iteration, model_name, input_id)
 
             output_emb = encode_output(output_item).reshape(1, -1)
-            target_emb = output_emb
+            target_emb = encode_output(target_item).reshape(1, -1)
 
             fake_embeddings.append(output_emb)
             real_embeddings.append(target_emb)
