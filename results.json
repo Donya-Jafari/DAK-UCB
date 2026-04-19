@@ -1,0 +1,7 @@
+{
+  "experiment": "simple_dak_ucb",
+  "task": "image_captioning",
+  "avg_diversity": 0.3335544368983878,
+  "avg_distance": 0.5783931937835641,
+  "avg_clip": 0.0
+}

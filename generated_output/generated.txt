@@ -1,0 +1,6 @@
+00000	caption_model_a	mock output 0
+00001	caption_model_b	mock output 1
+00002	caption_model_b	mock output 2
+00000	caption_model_a	mock output 0
+00001	caption_model_b	mock output 1
+00002	caption_model_a	mock output 2

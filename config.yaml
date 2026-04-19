@@ -1,66 +1,39 @@
-# DAK-UCB configuration
-
 experiment:
-  name: Image-Captioning
-  algorithm: DAK-UCB
-  objective: I-JRKE  # or JKD
-  task: image_captioning  # image_generation | image_captioning | llm_prompting
-  task_model_count:
-    image_generation: 2
-    image_captioning: 3
-    llm_prompting: 0
-  input:
-    image_dir: input_dataset/images
-    text_file: input_dataset/prompts.txt
-  target:
-    image_dir: target_dataset/images
-    text_file: target_dataset/prompts.txt
-  output:
-    image_dir: output_dataset/images
-    text_file: output_dataset/prompts.txt
+  name: simple_dak_ucb
+  task: image_captioning  # image_captioning | image_generation | llm_prompting
+  objective: I-JRKE  # I-JRKE | JKD
 
-modes:
+data:
+  input: input_dataset/images
+  output: target_dataset/prompts.txt
+  generated: generated_output
+
+routing:
   random: false
-  onearm: false
-  pak: false
   mix: false
+  pak: false
+  onearm: false
   oracle_choice: 0
 
-hyperparams:
+hyperparameters:
   constant: 1e-4
-  runs: 2
-  iterations: 3
-  prompt_feature_count: 512
-  image_feature_count: 768
-  delta: 5.8
+  runs: 1
+  delta: 3.8
   alpha: 1.0
   gamma: 1.0
   lambd: 1.0
 
 models:
-  image_generation:
-    - name: kandinsky
-      type: kandinsky
-      model_id: kandinsky-community/kandinsky-2-1
-    - name: sdxl
-      type: sdxl
-      model_id: stabilityai/stable-diffusion-xl-base-1.0
   captioning:
-    - name: blip2
-      type: blip2
-      model_id: Salesforce/blip2-opt-2.7b
-    - name: instructblip
-      type: instructblip
-      model_id: Salesforce/instructblip-flan-t5-xl
-    - name: llava
-      type: llava
-      model_id: llava-hf/llava-v1.6-mistral-7b-hf
+    - name: caption_model_a
+    - name: caption_model_b
+  generation:
+    - name: image_model_a
+    - name: image_model_b
   llm:
-  embeddings:
-    clip_model_id: openai/clip-vit-large-patch14
-    dinov2_model_id: facebook/dinov2-base
+    - name: llm_model_a
 
 runtime:
-  use_mock_data: false
+  use_mock: true
   seed: 42
-  device: gpu
+  result_file: results.json
